@@ -845,40 +845,72 @@ def tokendealer(self, p):
     padd = 0
     
     if forge:
-        if hasattr(p.sd_model, "text_processing_engine_l"):
-            tokenizer = p.sd_model.text_processing_engine_l.tokenize_line
-        else:
-            tokenizer = p.sd_model.text_processing_engine.tokenize_line
+        tokenizer = None
+        for attr in ['text_processing_engine_l', 'text_processing_engine_g',
+                     'text_processing_engine', 'text_processing_engine_t5']:
+            engine = getattr(p.sd_model, attr, None)
+            if engine is not None and hasattr(engine, 'tokenize_line'):
+                tokenizer = engine.tokenize_line
+                break
     else:
         tokenizer = shared.sd_model.conditioner.embedders[0].tokenize_line if self.is_sdxl else shared.sd_model.cond_stage_model.tokenize_line
-        
-    for pp in ppl:
-        tokens, tokensnum = tokenizer(pp)
-        pt.append([padd, tokensnum // TOKENS + 1 + padd])
-        ppt.append(tokensnum)
-        padd = tokensnum // TOKENS + 1 + padd
 
-    if "Pro" in self.mode:
-        for target in targets:
-            ptokens, tokensnum = tokenizer(ppl[0])
-            ttokens, _ = tokenizer(target)
+    if tokenizer is not None:
+        for pp in ppl:
+            result = tokenizer(pp)
+            if isinstance(result, tuple) and len(result) == 2:
+                tokens, tokensnum = result
+            else:
+                tokens = result
+                tokensnum = sum(len(c.tokens) for c in tokens) if tokens else 75
+            pt.append([padd, tokensnum // TOKENS + 1 + padd])
+            ppt.append(tokensnum)
+            padd = tokensnum // TOKENS + 1 + padd
 
-            i = 1
-            tlist = []
-            while ttokens[0].tokens[i] != 49407:
-                for (j, maintok) in enumerate(ptokens): # SBM Long prompt.
-                    if ttokens[0].tokens[i] in maintok.tokens:
-                        tlist.append(maintok.tokens.index(ttokens[0].tokens[i]) + 75 * j)
-                i += 1
-            if tlist != [] : tt.append(tlist)
+        if "Pro" in self.mode:
+            for target in targets:
+                result = tokenizer(ppl[0])
+                if isinstance(result, tuple) and len(result) == 2:
+                    ptokens, _ = result
+                else:
+                    ptokens = result
+                tresult = tokenizer(target)
+                if isinstance(tresult, tuple) and len(tresult) == 2:
+                    ttokens, _ = tresult
+                else:
+                    ttokens = tresult
 
-    paddp = padd
-    padd = 0
-    for np in npl:
-        _, tokensnum = tokenizer(np)
-        nt.append([padd, tokensnum // TOKENS + 1 + padd])
-        pnt.append(tokensnum)
-        padd = tokensnum // TOKENS + 1 + padd
+                i = 1
+                tlist = []
+                while ttokens[0].tokens[i] != 49407:
+                    for (j, maintok) in enumerate(ptokens): # SBM Long prompt.
+                        if ttokens[0].tokens[i] in maintok.tokens:
+                            tlist.append(maintok.tokens.index(ttokens[0].tokens[i]) + 75 * j)
+                    i += 1
+                if tlist != [] : tt.append(tlist)
+
+        paddp = padd
+        padd = 0
+        for np in npl:
+            result = tokenizer(np)
+            if isinstance(result, tuple) and len(result) == 2:
+                _, tokensnum = result
+            else:
+                tokensnum = sum(len(c.tokens) for c in result) if result else 75
+            nt.append([padd, tokensnum // TOKENS + 1 + padd])
+            pnt.append(tokensnum)
+            padd = tokensnum // TOKENS + 1 + padd
+    else:
+        for pp in ppl:
+            pt.append([padd, padd + 1])
+            ppt.append(75)
+            padd = padd + 1
+        paddp = padd
+        padd = 0
+        for np in npl:
+            nt.append([padd, padd + 1])
+            pnt.append(75)
+            padd = padd + 1
 
     self.eq = paddp == padd and eqb
 
