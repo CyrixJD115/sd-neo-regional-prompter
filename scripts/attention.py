@@ -519,6 +519,20 @@ def split_dims(xs, height, width, self = None):
             if iter_count == max_iter:
                 raise RuntimeError(f"Error in Regional Pronpter, cannot resolve divisions{dsh}, {dsw}, {xs}")
 
+    if dsh * dsw != xs:
+        best_dh = 1
+        best_diff = float('inf')
+        target_ratio = height / width if width > 0 else 1.0
+        for dh in range(1, int(math.sqrt(xs)) + 1):
+            if xs % dh == 0:
+                dw = xs // dh
+                ratio = dh / dw
+                diff = abs(ratio - target_ratio)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_dh = dh
+        dsh, dsw = best_dh, xs // best_dh
+
     if self is not None:
         if self.debug and self.count == 0: print(scale,dsh,dsw,dsh*dsw,xs, height, width)
 
