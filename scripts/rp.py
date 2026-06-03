@@ -1139,12 +1139,12 @@ def presetfallback():
     global PTPRESETALT
     
     if PTPRESETALT is not None:
-        print("Unknown preset error, fallback.")
+        print("Warning: preset file issue, trying alternate path.")
         PTPRESET = PTPRESETALT
         PTPRESETALT = None
         return loadpresets(PTPRESET)
     else: # Already attempted swap.
-        print("Presets could not be loaded.") 
+        print("Warning: presets could not be loaded from any path.") 
         return None
 
 def loadpresets(filepath):
@@ -1154,8 +1154,8 @@ def loadpresets(filepath):
             # presets = json.loads(json.load(f))
             presets = json.load(f)
             # presets = loadblob(presets) # DO NOT load all blobs - that's the point.
-    except OSError as e:
-        print("Init / preset error.")
+    except (OSError, FileNotFoundError):
+        print("Initializing default presets (first run or missing file).")
         presets = initpresets(filepath)
     except TypeError:
         print("Corrupted preset file, resetting.")
